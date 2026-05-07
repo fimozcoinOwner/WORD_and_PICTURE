@@ -1,0 +1,64 @@
+{
+    "levels": [
+        {
+            "id": 1,
+            "image": ["кот.png"],
+            "correct_word": "КОТ",
+            "letters": "Т А М Б У О С К"
+        },
+        {
+            "id": 2,
+            "image": ["лето.png"],
+            "correct_word": "ЛЕТО",
+            "letters": "У Е К О С Т Ц Л"
+        },
+        {
+            "id": 3,
+            "image": ["фрукты.png"],
+            "correct_word": "ФРУКТЫ",
+            "letters": "Ф К Р Ы А У Т К"
+        },
+        {
+            "id": 4,
+            "image": ["музыка.png"],
+            "correct_word": "МУЗЫКА",
+            "letters": "Ы А М Б У З С К"
+        },
+        {
+            "id": 5,
+            "image": ["одежда.png"],
+            "correct_word": "ОДЕЖДА",
+            "letters": "Я А Д Б У О Е Ж"
+        },
+        {
+            "id": 6,
+            "image": ["космос.png"],
+            "correct_word": "КОСМОС",
+            "letters": "Л И М Б Ч О С К"
+        },
+        {
+            "id": 7,
+            "image": ["мышь.png"],
+            "correct_word": "МЫШЬ",
+            "letters": "Т А Ш Б У М Ь Ы"
+        },
+        {
+            "id": 8,
+            "image": ["замок.png"],
+            "correct_word": "ЗАМОК",
+            "letters": "Х З М Б К О А И"
+        },
+        {
+            "id": 9,
+            "image": ["ключ.png"],
+            "correct_word": "КЛЮЧ",
+            "letters": "Т А Ю Б Ч Л С К"
+        },
+        {
+            "id": 10,
+            "image": ["сезон.png"],
+            "correct_word": "СЕЗОН",
+            "letters": "Н А Е Б З О С К"
+        }
+    ]
+}
