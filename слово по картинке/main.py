@@ -113,10 +113,11 @@ class GameWindow(QWidget):
         self.stars = stars
         self.main_window_callback = main_window_callback
 
-        # массив с буквами, которые уже ввёл пользователь
+        self.correct_word = level_data["correct_word"]
+        self.word_length = len(self.correct_word)
+
+        self.revealed_positions = [False] * self.word_length
         self.current_input = []
-        self.word_length = len(level_data["correct_word"])
-        self.revealed_letters = []
 
         self.setWindowTitle("Слово по картинке – Уровень")
         self.setMinimumSize(800, 600)
@@ -235,6 +236,7 @@ class GameWindow(QWidget):
         row2_layout.setSpacing(15)
 
         self.letter_buttons = []
+        self.used_letters_count = {}
 
         # создание кнопок для первого ряда
         for letter in row1_letters:
@@ -372,6 +374,7 @@ class GameWindow(QWidget):
         self.setLayout(main_layout)
 
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.update_word_display()
 
     # загрузка картинки из файла
     def load_image(self):
@@ -409,25 +412,40 @@ class GameWindow(QWidget):
         button = self.sender()
         letter = button.text()
 
-        if letter and len(self.current_input) < self.word_length:
-            self.current_input.append(letter)
-            button.setEnabled(False)
+        if letter:
+            self.add_letter(letter)
+
+    # добавление буквы в слово
+    def add_letter(self, letter):
+        any_revealed = False
+        for i in range(self.word_length):
+            if not self.revealed_positions[i] and self.correct_word[i] == letter:
+                self.revealed_positions[i] = True
+                any_revealed = True
+
+        if any_revealed:
             self.update_word_display()
+            if all(self.revealed_positions):
+                self.check_answer()
 
     # обновление отображения введённых букв в ячейках
     def update_word_display(self):
         for i, cell in enumerate(self.letter_cells):
-            if i < len(self.current_input):
-                cell.setText(self.current_input[i])
+            if self.revealed_positions[i]:
+                cell.setText(self.correct_word[i])
             else:
-                cell.setText("")
+                cell.setText("_")
 
-        if len(self.current_input) == self.word_length:
-            self.check_answer()
+        self.current_input = []
+        for i in range(self.word_length):
+            if self.revealed_positions[i]:
+                self.current_input.append(self.correct_word[i])
+            else:
+                self.current_input.append("")
 
     # полная очистка всех введённых букв
     def clear_input(self):
-        self.current_input = []
+        self.revealed_positions = [False] * self.word_length
         self.update_word_display()
 
     # проверка правильности ответа
@@ -437,7 +455,6 @@ class GameWindow(QWidget):
 
         if user_word == correct_word:
             self.stars += 10
-
             self.save_progress()
             self.next_level()
         else:
@@ -452,7 +469,6 @@ class GameWindow(QWidget):
 
         if game_window is not None:
             self.next_window = game_window
-
             self.close()
             self.next_window.show()
         else:
@@ -474,6 +490,7 @@ class GameWindow(QWidget):
     # возврат в главное окно
     def exit_to_menu(self):
         self.close()
+        from main import MainWindow
         self.main_window = MainWindow()
         self.main_window.show()
 
@@ -486,19 +503,22 @@ class GameWindow(QWidget):
         key_text = event.text().upper()
 
         if key_text and key_text.isalpha() and len(key_text) == 1:
-            available_letters = []
-            for btn in self.letter_buttons:
-                if btn.text():
-                    available_letters.append(btn.text())
+            if key_text in self.correct_word:
+                has_unrevealed = False
+                for i in range(self.word_length):
+                    if not self.revealed_positions[i] and self.correct_word[i] == key_text:
+                        has_unrevealed = True
+                        break
 
-            if key_text in available_letters and len(self.current_input) < self.word_length:
-                self.current_input.append(key_text)
-                self.update_word_display()
+                if has_unrevealed:
+                    self.add_letter(key_text)
 
         if event.key() == Qt.Key.Key_Backspace:
-            if self.current_input:
-                self.current_input.pop()
-                self.update_word_display()
+            for i in range(self.word_length - 1, -1, -1):
+                if self.revealed_positions[i]:
+                    self.revealed_positions[i] = False
+                    self.update_word_display()
+                    break
 
     # открытие диалогового окна подсказки
     def hint_dialog(self):
@@ -512,16 +532,11 @@ class GameWindow(QWidget):
             self.stars -= 25
             self.stars_label.setText(f"⭐ {self.stars}")
 
-            correct_word = self.level_data["correct_word"]
-
-            for i in range(len(correct_word)):
-                if i not in self.revealed_letters:
-                    self.revealed_letters.append(i)
-                    if i >= len(self.current_input):
-                        self.current_input.append(correct_word[i])
-                    else:
-                        self.current_input[i] = correct_word[i]
+            for i in range(self.word_length):
+                if not self.revealed_positions[i]:
+                    self.revealed_positions[i] = True
                     self.update_word_display()
+                    self.check_answer()
                     break
 
 
