@@ -2,7 +2,8 @@ import sys
 import json
 import random
 import os
-from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame, QMessageBox, QDialog
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame, QMessageBox, \
+    QDialog
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QKeyEvent, QPixmap
 
@@ -116,8 +117,10 @@ class GameWindow(QWidget):
         self.correct_word = level_data["correct_word"]
         self.word_length = len(self.correct_word)
 
-        self.revealed_positions = [False] * self.word_length
-        self.current_input = []
+        # Текущий индекс для ввода (следующая позиция)
+        self.current_position = 0
+        # Введённые буквы
+        self.current_input = [""] * self.word_length
 
         self.setWindowTitle("Слово по картинке – Уровень")
         self.setMinimumSize(800, 600)
@@ -236,7 +239,6 @@ class GameWindow(QWidget):
         row2_layout.setSpacing(15)
 
         self.letter_buttons = []
-        self.used_letters_count = {}
 
         # создание кнопок для первого ряда
         for letter in row1_letters:
@@ -374,6 +376,7 @@ class GameWindow(QWidget):
         self.setLayout(main_layout)
 
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setFocus()
         self.update_word_display()
 
     # загрузка картинки из файла
@@ -412,40 +415,27 @@ class GameWindow(QWidget):
         button = self.sender()
         letter = button.text()
 
-        if letter:
-            self.add_letter(letter)
-
-    # добавление буквы в слово
-    def add_letter(self, letter):
-        any_revealed = False
-        for i in range(self.word_length):
-            if not self.revealed_positions[i] and self.correct_word[i] == letter:
-                self.revealed_positions[i] = True
-                any_revealed = True
-
-        if any_revealed:
+        if letter and self.current_position < self.word_length:
+            self.current_input[self.current_position] = letter
+            self.current_position += 1
             self.update_word_display()
-            if all(self.revealed_positions):
+
+            # Проверяем, заполнено ли всё слово
+            if self.current_position == self.word_length:
                 self.check_answer()
 
     # обновление отображения введённых букв в ячейках
     def update_word_display(self):
         for i, cell in enumerate(self.letter_cells):
-            if self.revealed_positions[i]:
-                cell.setText(self.correct_word[i])
+            if self.current_input[i]:
+                cell.setText(self.current_input[i])
             else:
                 cell.setText("_")
 
-        self.current_input = []
-        for i in range(self.word_length):
-            if self.revealed_positions[i]:
-                self.current_input.append(self.correct_word[i])
-            else:
-                self.current_input.append("")
-
     # полная очистка всех введённых букв
     def clear_input(self):
-        self.revealed_positions = [False] * self.word_length
+        self.current_position = 0
+        self.current_input = [""] * self.word_length
         self.update_word_display()
 
     # проверка правильности ответа
@@ -458,8 +448,12 @@ class GameWindow(QWidget):
             self.save_progress()
             self.next_level()
         else:
-            QMessageBox.warning(self, "Неверно", f"Неправильно. Попробуй ещё раз!")
-            self.clear_input()
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("Неверно")
+            msg_box.setText("Неправильно. Попробуй ещё раз!")
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg_box.setStyleSheet("QLabel{ color: black; font-size: 14px; } QPushButton{ color: black; }")
+            msg_box.exec()
 
     # переход к следующему уровню
     def next_level(self):
@@ -472,8 +466,24 @@ class GameWindow(QWidget):
             self.close()
             self.next_window.show()
         else:
-            QMessageBox.information(None, "Поздравляю!", "Ты прошёл все уровни!")
-            self.exit_to_menu()
+            # Все уровни пройдены
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("Поздравляю!")
+            msg_box.setText("Ты прошёл все уровни!")
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg_box.setStyleSheet("QLabel{ color: black; font-size: 14px; } QPushButton{ color: black; }")
+            reply = msg_box.exec()
+            if reply == QMessageBox.StandardButton.Ok:
+                progress = {
+                    "current_level": 1,
+                    "stars": 0
+                }
+                try:
+                    with open("progress.json", "w", encoding="utf-8") as f:
+                        json.dump(progress, f, ensure_ascii=False, indent=4)
+                except:
+                    pass
+                self.exit_to_menu()
 
     # сохранение прогресса (номер уровня и количество звёзд)
     def save_progress(self):
@@ -503,41 +513,49 @@ class GameWindow(QWidget):
         key_text = event.text().upper()
 
         if key_text and key_text.isalpha() and len(key_text) == 1:
-            if key_text in self.correct_word:
-                has_unrevealed = False
-                for i in range(self.word_length):
-                    if not self.revealed_positions[i] and self.correct_word[i] == key_text:
-                        has_unrevealed = True
-                        break
+            if self.current_position < self.word_length:
+                self.current_input[self.current_position] = key_text
+                self.current_position += 1
+                self.update_word_display()
 
-                if has_unrevealed:
-                    self.add_letter(key_text)
+                if self.current_position == self.word_length:
+                    self.check_answer()
+            event.accept()
+            return
 
         if event.key() == Qt.Key.Key_Backspace:
-            for i in range(self.word_length - 1, -1, -1):
-                if self.revealed_positions[i]:
-                    self.revealed_positions[i] = False
-                    self.update_word_display()
-                    break
+            if self.current_position > 0:
+                self.current_position -= 1
+                self.current_input[self.current_position] = ""
+                self.update_word_display()
+            event.accept()
+            return
+
+        event.accept()
 
     # открытие диалогового окна подсказки
     def hint_dialog(self):
         if self.stars < 25:
             dialog = HintDialog(self, "Недостаточно звёзд! Нужно 25 звёзд для подсказки.", has_yes_no=False)
+            dialog.setStyleSheet("QLabel{ color: black; } QPushButton{ color: black; }")
             dialog.exec()
             return
 
         dialog = HintDialog(self, "Вы уверены, что хотите потратить 25 звёзд на подсказку?", has_yes_no=True)
+        dialog.setStyleSheet("QLabel{ color: black; } QPushButton{ color: black; }")
         if dialog.exec() and dialog.result:
             self.stars -= 25
             self.stars_label.setText(f"⭐ {self.stars}")
 
-            for i in range(self.word_length):
-                if not self.revealed_positions[i]:
-                    self.revealed_positions[i] = True
-                    self.update_word_display()
+            # подсказка вставляет правильную букву на текущую позицию
+            if self.current_position < self.word_length:
+                correct_letter = self.correct_word[self.current_position]
+                self.current_input[self.current_position] = correct_letter
+                self.current_position += 1
+                self.update_word_display()
+
+                if self.current_position == self.word_length:
                     self.check_answer()
-                    break
 
 
 # главное окно с кнопкой запуска игры
@@ -643,7 +661,16 @@ class MainWindow(QWidget):
             QMessageBox.information(self, "Поздравляю!", "Ты прошёл все уровни!")
             self.current_level = 1
             self.stars = 0
-            self.start_game()
+            progress = {
+                "current_level": 1,
+                "stars": 0
+            }
+            try:
+                with open("progress.json", "w", encoding="utf-8") as f:
+                    json.dump(progress, f, ensure_ascii=False, indent=4)
+            except:
+                pass
+            self.show()
 
     # получение следующего уровня для продолжения игры
     def load_next_level(self, next_level_num, stars):
