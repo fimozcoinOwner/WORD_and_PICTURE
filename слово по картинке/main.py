@@ -1,11 +1,28 @@
 import sys
+import os
 import json
 import random
-import os
-from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame, QMessageBox, \
-    QDialog
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame, QMessageBox, QDialog
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QKeyEvent, QPixmap
+
+
+# Функция для правильного поиска файлов (для сборки в exe)
+def resource_path(relative_path):
+    """Возвращает правильный путь к файлу как в разработке, так и в собранном exe"""
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+
+# Функции для сохранения прогресса в папку пользователя
+def get_progress_path():
+    """Возвращает путь к файлу прогресса в папке пользователя"""
+    app_data = os.path.join(os.environ['APPDATA'], 'SlovoPoKartinke')
+    os.makedirs(app_data, exist_ok=True)
+    return os.path.join(app_data, 'progress.json')
 
 
 # диалоговое окно покупки подсказок
@@ -26,7 +43,6 @@ class HintDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setSpacing(20)
 
-        # текст сообщения
         title = QLabel(message)
         title.setStyleSheet("color: black; font-size: 16px; font-weight: bold;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -36,7 +52,6 @@ class HintDialog(QDialog):
         buttons_layout = QHBoxLayout()
 
         if has_yes_no:
-            # кнопка "нет" - закрыть окно без подсказки
             no_btn = QPushButton("Нет")
             no_btn.setFixedSize(120, 45)
             no_btn.setStyleSheet("""
@@ -54,7 +69,6 @@ class HintDialog(QDialog):
             no_btn.clicked.connect(self.reject)
             buttons_layout.addWidget(no_btn)
 
-            # кнопка "да" - потратить звёзды и получить подсказку
             yes_btn = QPushButton("Да")
             yes_btn.setFixedSize(120, 45)
             yes_btn.setStyleSheet("""
@@ -72,7 +86,6 @@ class HintDialog(QDialog):
             yes_btn.clicked.connect(self.accept)
             buttons_layout.addWidget(yes_btn)
         else:
-            # кнопка "понятно"
             ok_btn = QPushButton("Понятно")
             ok_btn.setFixedSize(150, 45)
             ok_btn.setStyleSheet("""
@@ -94,12 +107,10 @@ class HintDialog(QDialog):
 
         layout.addLayout(buttons_layout)
 
-    # подтверждение действия
     def accept(self):
         self.result = True
         super().accept()
 
-    # отклонение действия
     def reject(self):
         self.result = False
         super().reject()
@@ -116,24 +127,23 @@ class GameWindow(QWidget):
 
         self.correct_word = level_data["correct_word"]
         self.word_length = len(self.correct_word)
-
-        # Текущий индекс для ввода (следующая позиция)
         self.current_position = 0
-        # Введённые буквы
         self.current_input = [""] * self.word_length
+
+        # Получаем доступные буквы из данных уровня
+        letters_str = level_data.get("letters", "")
+        self.available_letters = set(letters_str.replace(" ", ""))
 
         self.setWindowTitle("Слово по картинке – Уровень")
         self.setMinimumSize(800, 600)
         self.setStyleSheet("background-color: white;")
         self.showFullScreen()
 
-        # главное вертикальное выравнивание
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(50, 30, 50, 30)
 
         top_layout = QHBoxLayout()
 
-        # круглая зелёная кнопка для выхода в главное меню
         self.back_button = QPushButton("←")
         self.back_button.setFixedSize(60, 60)
         self.back_button.setFont(QFont("Arial", 30, QFont.Weight.Bold))
@@ -151,13 +161,11 @@ class GameWindow(QWidget):
         self.back_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.back_button.clicked.connect(self.exit_to_menu)
 
-        # текстовое поле с номером текущего уровня
         self.level_label = QLabel(f"УРОВЕНЬ {self.current_level_num}")
         self.level_label.setFont(QFont("Arial", 28, QFont.Weight.Bold))
         self.level_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.level_label.setStyleSheet("color: black;")
 
-        # зелёная рамка с количеством звёзд у игрока
         self.stars_frame = QFrame()
         self.stars_frame.setFixedSize(100, 60)
         self.stars_frame.setStyleSheet("background-color: #2ecc71; border-radius: 15px;")
@@ -175,7 +183,6 @@ class GameWindow(QWidget):
         top_layout.addStretch()
         top_layout.addWidget(self.stars_frame)
 
-        # место для отображения картинки-коллажа
         self.image_label = QLabel()
         self.image_label.setFixedSize(350, 350)
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -183,8 +190,6 @@ class GameWindow(QWidget):
             background-color: #ecf0f1;
             border: 2px solid #bdc3c7;
         """)
-
-        # загрузка изображения из папки с проектом
         self.load_image()
 
         images_container = QHBoxLayout()
@@ -192,7 +197,6 @@ class GameWindow(QWidget):
         images_container.addWidget(self.image_label)
         images_container.addStretch()
 
-        # поле для ввода букв (ячейки под каждую букву слова)
         word_widget = QWidget()
         self.word_letters_layout = QHBoxLayout(word_widget)
         self.word_letters_layout.setSpacing(10)
@@ -219,17 +223,13 @@ class GameWindow(QWidget):
         word_container.addWidget(word_widget)
         word_container.addStretch()
 
-        # панель с кнопками-буквами (8 штук, 2 ряда по 4)
         letters_widget = QWidget()
         letters_layout = QVBoxLayout(letters_widget)
         letters_layout.setSpacing(15)
 
-        # получение строки с буквами из json и перемешивание
-        letters_str = level_data.get("letters", "")
         letters_list = list(letters_str.replace(" ", ""))
         random.shuffle(letters_list)
 
-        # разбивка на два ряда по 4 буквы
         row1_letters = letters_list[:4]
         row2_letters = letters_list[4:8] if len(letters_list) > 4 else []
 
@@ -240,7 +240,6 @@ class GameWindow(QWidget):
 
         self.letter_buttons = []
 
-        # создание кнопок для первого ряда
         for letter in row1_letters:
             letter_btn = QPushButton(letter)
             letter_btn.setFixedSize(70, 70)
@@ -261,7 +260,6 @@ class GameWindow(QWidget):
             self.letter_buttons.append(letter_btn)
             row1_layout.addWidget(letter_btn)
 
-        # создание кнопок для второго ряда
         for letter in row2_letters:
             letter_btn = QPushButton(letter)
             letter_btn.setFixedSize(70, 70)
@@ -304,11 +302,9 @@ class GameWindow(QWidget):
         letters_container.addWidget(letters_widget)
         letters_container.addStretch()
 
-        # нижние кнопки управления
         bottom_buttons_layout = QHBoxLayout()
         bottom_buttons_layout.setContentsMargins(0, 20, 0, 0)
 
-        # серая кнопка для очистки всего введённого слова
         self.cancel_button = QPushButton("ОТМЕНИТЬ")
         self.cancel_button.setFixedSize(150, 50)
         self.cancel_button.setFont(QFont("Arial", 14, QFont.Weight.Bold))
@@ -326,7 +322,6 @@ class GameWindow(QWidget):
         self.cancel_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.cancel_button.clicked.connect(self.clear_input)
 
-        # оранжевая кнопка для вызова подсказки
         self.hint_button = QPushButton("ПОДСКАЗКА")
         self.hint_button.setFixedSize(150, 50)
         self.hint_button.setFont(QFont("Arial", 14, QFont.Weight.Bold))
@@ -379,7 +374,6 @@ class GameWindow(QWidget):
         self.setFocus()
         self.update_word_display()
 
-    # загрузка картинки из файла
     def load_image(self):
         image_data = self.level_data.get("image")
 
@@ -388,29 +382,30 @@ class GameWindow(QWidget):
         else:
             image_file = image_data
 
-        if image_file and os.path.exists(image_file):
-            try:
-                pixmap = QPixmap(image_file)
-                if not pixmap.isNull():
-                    pixmap = pixmap.scaled(
-                        380, 380,
-                        Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation
-                    )
-                    self.image_label.setPixmap(pixmap)
-                else:
-                    self.image_label.setStyleSheet(
-                        "background-color: #ffcccc; border-radius: 20px; border: 2px solid #ff0000;"
-                    )
-            except Exception as e:
-                print(f"ошибка загрузки: {e}")
-        else:
-            print(f"файл не найден: {image_file}")
-            self.image_label.setStyleSheet(
-                "background-color: #ffcccc; border-radius: 20px; border: 2px solid #ff0000;"
-            )
+        if image_file:
+            image_path = resource_path(image_file)
+            if os.path.exists(image_path):
+                try:
+                    pixmap = QPixmap(image_path)
+                    if not pixmap.isNull():
+                        pixmap = pixmap.scaled(
+                            380, 380,
+                            Qt.AspectRatioMode.KeepAspectRatio,
+                            Qt.TransformationMode.SmoothTransformation
+                        )
+                        self.image_label.setPixmap(pixmap)
+                    else:
+                        self.image_label.setStyleSheet(
+                            "background-color: #ffcccc; border-radius: 20px; border: 2px solid #ff0000;"
+                        )
+                except Exception as e:
+                    print(f"ошибка загрузки: {e}")
+            else:
+                print(f"файл не найден: {image_path}")
+                self.image_label.setStyleSheet(
+                    "background-color: #ffcccc; border-radius: 20px; border: 2px solid #ff0000;"
+                )
 
-    # обработчик клика по кнопке с буквой
     def on_letter_clicked(self):
         button = self.sender()
         letter = button.text()
@@ -420,11 +415,9 @@ class GameWindow(QWidget):
             self.current_position += 1
             self.update_word_display()
 
-            # Проверяем, заполнено ли всё слово
             if self.current_position == self.word_length:
                 self.check_answer()
 
-    # обновление отображения введённых букв в ячейках
     def update_word_display(self):
         for i, cell in enumerate(self.letter_cells):
             if self.current_input[i]:
@@ -432,13 +425,11 @@ class GameWindow(QWidget):
             else:
                 cell.setText("_")
 
-    # полная очистка всех введённых букв
     def clear_input(self):
         self.current_position = 0
         self.current_input = [""] * self.word_length
         self.update_word_display()
 
-    # проверка правильности ответа
     def check_answer(self):
         user_word = "".join(self.current_input)
         correct_word = self.level_data["correct_word"]
@@ -454,11 +445,11 @@ class GameWindow(QWidget):
             msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
             msg_box.setStyleSheet("QLabel{ color: black; font-size: 14px; } QPushButton{ color: black; }")
             msg_box.exec()
+            # Очищаем ввод после неправильного ответа
+            self.clear_input()
 
-    # переход к следующему уровню
     def next_level(self):
         next_level_num = self.current_level_num + 1
-
         game_window = self.main_window_callback(next_level_num, self.stars)
 
         if game_window is not None:
@@ -466,7 +457,6 @@ class GameWindow(QWidget):
             self.close()
             self.next_window.show()
         else:
-            # Все уровни пройдены
             msg_box = QMessageBox(self)
             msg_box.setWindowTitle("Поздравляю!")
             msg_box.setText("Ты прошёл все уровни!")
@@ -474,62 +464,40 @@ class GameWindow(QWidget):
             msg_box.setStyleSheet("QLabel{ color: black; font-size: 14px; } QPushButton{ color: black; }")
             reply = msg_box.exec()
             if reply == QMessageBox.StandardButton.Ok:
-                progress = {
-                    "current_level": 1,
-                    "stars": 0
-                }
+                progress = {"current_level": 1, "stars": 0}
                 try:
-                    with open("progress.json", "w", encoding="utf-8") as f:
+                    progress_path = get_progress_path()
+                    with open(progress_path, "w", encoding="utf-8") as f:
                         json.dump(progress, f, ensure_ascii=False, indent=4)
-                except:
-                    pass
+                except Exception as e:
+                    print(f"Ошибка сброса прогресса: {e}")
                 self.exit_to_menu()
 
-    # сохранение прогресса (номер уровня и количество звёзд)
     def save_progress(self):
         progress = {
             "current_level": self.current_level_num + 1,
             "stars": self.stars
         }
         try:
-            with open("progress.json", "w", encoding="utf-8") as f:
+            progress_path = get_progress_path()
+            with open(progress_path, "w", encoding="utf-8") as f:
                 json.dump(progress, f, ensure_ascii=False, indent=4)
-        except:
-            pass
+        except Exception as e:
+            print(f"Ошибка сохранения прогресса: {e}")
 
-    # возврат в главное окно
     def exit_to_menu(self):
         self.close()
         from main import MainWindow
         self.main_window = MainWindow()
         self.main_window.show()
 
-    # обработка нажатий клавиш (ввод букв, backspace, esc)
     def keyPressEvent(self, event: QKeyEvent):
-        # обработка ESC - полное закрытие приложения
+        # Обработка ESC
         if event.key() == Qt.Key.Key_Escape:
             QApplication.quit()
             return
 
-        key_text = event.text().upper()
-
-        # проверяем, что введенная буква есть в доступных буквах
-        if key_text and key_text.isalpha() and len(key_text) == 1:
-            # получаем доступные буквы из данных уровня
-            letters_str = self.level_data.get("letters", "")
-            available_letters = set(letters_str.replace(" ", ""))
-
-            if key_text in available_letters:
-                if self.current_position < self.word_length:
-                    self.current_input[self.current_position] = key_text
-                    self.current_position += 1
-                    self.update_word_display()
-
-                    if self.current_position == self.word_length:
-                        self.check_answer()
-            return
-
-        # обработка Backspace
+        # Обработка Backspace
         if event.key() == Qt.Key.Key_Backspace:
             if self.current_position > 0:
                 self.current_position -= 1
@@ -537,9 +505,21 @@ class GameWindow(QWidget):
                 self.update_word_display()
             return
 
+        # Обработка букв - РАБОТАЕТ СО ВСЕМИ БУКВАМИ
+        key_text = event.text().upper()
+        if key_text and key_text.isalpha() and len(key_text) == 1:
+            if self.current_position < self.word_length:
+                self.current_input[self.current_position] = key_text
+                self.current_position += 1
+                self.update_word_display()
+
+                if self.current_position == self.word_length:
+                    self.check_answer()
+            return
+
+        # Для всех остальных клавиш
         super().keyPressEvent(event)
 
-    # открытие диалогового окна подсказки
     def hint_dialog(self):
         if self.stars < 25:
             dialog = HintDialog(self, "Недостаточно звёзд! Нужно 25 звёзд для подсказки.", has_yes_no=False)
@@ -553,7 +533,6 @@ class GameWindow(QWidget):
             self.stars -= 25
             self.stars_label.setText(f"⭐ {self.stars}")
 
-            # подсказка вставляет правильную букву на текущую позицию
             if self.current_position < self.word_length:
                 correct_letter = self.correct_word[self.current_position]
                 self.current_input[self.current_position] = correct_letter
@@ -582,7 +561,6 @@ class MainWindow(QWidget):
         center_layout = QVBoxLayout()
         center_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # крупное название игры в центре главного окна
         title_label = QLabel("СЛОВО ПО КАРТИНКЕ")
         title_label.setFont(QFont("Arial", 60, QFont.Weight.Bold))
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -591,7 +569,6 @@ class MainWindow(QWidget):
 
         center_layout.addSpacing(40)
 
-        # большая круглая зелёная кнопка с треугольником для старта
         self.play_button = QPushButton()
         self.play_button.setFixedSize(200, 200)
         self.play_button.setStyleSheet("""
@@ -605,7 +582,6 @@ class MainWindow(QWidget):
             }
         """)
         self.play_button.setCursor(Qt.CursorShape.PointingHandCursor)
-
         self.play_button.setText("▶")
         self.play_button.setFont(QFont("Arial", 60, QFont.Weight.Bold))
         self.play_button.setStyleSheet(self.play_button.styleSheet() + "color: white;")
@@ -617,7 +593,6 @@ class MainWindow(QWidget):
         main_layout.addLayout(center_layout)
         main_layout.addStretch()
 
-        # надпись об источнике изображений
         source_label = QLabel("Изображения сгенерированы нейросетью")
         source_label.setFont(QFont("Arial", 8))
         source_label.setStyleSheet("color: #cccccc; background-color: transparent;")
@@ -629,10 +604,10 @@ class MainWindow(QWidget):
 
         self.setLayout(main_layout)
 
-    # загрузка массива уровней из json-файла
     def load_levels(self):
         try:
-            with open("levels.json", "r", encoding="utf-8") as f:
+            levels_path = resource_path("levels.json")
+            with open(levels_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 return data["levels"]
         except FileNotFoundError:
@@ -642,17 +617,16 @@ class MainWindow(QWidget):
             QMessageBox.critical(self, "Ошибка", "Ошибка в файле levels.json!")
             return []
 
-    # загрузка сохранённого прогресса (текущий уровень и звёзды)
     def load_stars(self):
         try:
-            with open("progress.json", "r", encoding="utf-8") as f:
+            progress_path = get_progress_path()
+            with open(progress_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 self.current_level = data.get("current_level", 1)
                 return data.get("stars", 0)
         except:
             return 0
 
-    # запуск игры с текущего уровня
     def start_game(self):
         if not self.levels:
             QMessageBox.critical(self, "Ошибка", "Нет загруженных уровней!")
@@ -667,18 +641,15 @@ class MainWindow(QWidget):
             QMessageBox.information(self, "Поздравляю!", "Ты прошёл все уровни!")
             self.current_level = 1
             self.stars = 0
-            progress = {
-                "current_level": 1,
-                "stars": 0
-            }
+            progress = {"current_level": 1, "stars": 0}
             try:
-                with open("progress.json", "w", encoding="utf-8") as f:
+                progress_path = get_progress_path()
+                with open(progress_path, "w", encoding="utf-8") as f:
                     json.dump(progress, f, ensure_ascii=False, indent=4)
             except:
                 pass
             self.show()
 
-    # получение следующего уровня для продолжения игры
     def load_next_level(self, next_level_num, stars):
         if next_level_num <= len(self.levels):
             level_data = self.levels[next_level_num - 1]
@@ -686,7 +657,6 @@ class MainWindow(QWidget):
         else:
             return None
 
-    # выход из игры по клавише esc
     def keyPressEvent(self, event: QKeyEvent):
         if event.key() == Qt.Key.Key_Escape:
             QApplication.quit()
