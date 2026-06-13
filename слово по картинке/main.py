@@ -506,17 +506,19 @@ class GameWindow(QWidget):
 
     # обработка нажатий клавиш (ввод букв, backspace, esc)
     def keyPressEvent(self, event: QKeyEvent):
+        # обработка ESC - полное закрытие приложения
         if event.key() == Qt.Key.Key_Escape:
-            self.exit_to_menu()
+            QApplication.quit()
             return
-
-        # получаем список доступных букв из кнопок
-        available_letters = [btn.text() for btn in self.letter_buttons if btn.text()]
 
         key_text = event.text().upper()
 
         # проверяем, что введенная буква есть в доступных буквах
         if key_text and key_text.isalpha() and len(key_text) == 1:
+            # получаем доступные буквы из данных уровня
+            letters_str = self.level_data.get("letters", "")
+            available_letters = set(letters_str.replace(" ", ""))
+
             if key_text in available_letters:
                 if self.current_position < self.word_length:
                     self.current_input[self.current_position] = key_text
@@ -525,19 +527,17 @@ class GameWindow(QWidget):
 
                     if self.current_position == self.word_length:
                         self.check_answer()
-            # если буква не входит в доступные, просто игнорируем её (не добавляем)
-            event.accept()
             return
 
+        # обработка Backspace
         if event.key() == Qt.Key.Key_Backspace:
             if self.current_position > 0:
                 self.current_position -= 1
                 self.current_input[self.current_position] = ""
                 self.update_word_display()
-            event.accept()
             return
 
-        event.accept()
+        super().keyPressEvent(event)
 
     # открытие диалогового окна подсказки
     def hint_dialog(self):
