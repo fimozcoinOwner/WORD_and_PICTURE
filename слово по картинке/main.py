@@ -510,16 +510,22 @@ class GameWindow(QWidget):
             self.exit_to_menu()
             return
 
+        # получаем список доступных букв из кнопок
+        available_letters = [btn.text() for btn in self.letter_buttons if btn.text()]
+
         key_text = event.text().upper()
 
+        # проверяем, что введенная буква есть в доступных буквах
         if key_text and key_text.isalpha() and len(key_text) == 1:
-            if self.current_position < self.word_length:
-                self.current_input[self.current_position] = key_text
-                self.current_position += 1
-                self.update_word_display()
+            if key_text in available_letters:
+                if self.current_position < self.word_length:
+                    self.current_input[self.current_position] = key_text
+                    self.current_position += 1
+                    self.update_word_display()
 
-                if self.current_position == self.word_length:
-                    self.check_answer()
+                    if self.current_position == self.word_length:
+                        self.check_answer()
+            # если буква не входит в доступные, просто игнорируем её (не добавляем)
             event.accept()
             return
 
